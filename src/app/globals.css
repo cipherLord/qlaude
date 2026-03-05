@@ -1,0 +1,157 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-gray-950 text-white;
+    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-700 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-600;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-gray-900/70 backdrop-blur-xl border border-gray-800/60 rounded-2xl;
+  }
+
+  .glass-nav {
+    @apply bg-gray-900/80 backdrop-blur-xl border-b border-gray-800/60;
+  }
+
+  .gradient-border {
+    @apply relative overflow-hidden rounded-2xl;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.15));
+  }
+
+  .gradient-border::before {
+    content: "";
+    @apply absolute inset-0 rounded-2xl;
+    padding: 1px;
+    background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899, #6366f1);
+    background-size: 300% 300%;
+    animation: gradient-shift 8s ease infinite;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+  }
+
+  .glow-indigo {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.15), 0 0 60px rgba(99, 102, 241, 0.05);
+  }
+
+  .glow-emerald {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.15), 0 0 60px rgba(16, 185, 129, 0.05);
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent;
+  }
+
+  .btn-primary {
+    @apply relative bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-all duration-200 overflow-hidden;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+
+  .input-field {
+    @apply w-full bg-gray-800/60 border border-gray-700/60 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-200;
+  }
+
+  .input-field:focus {
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+  }
+
+  .card-hover {
+    @apply transition-all duration-300;
+  }
+
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  }
+
+  .stat-card {
+    @apply glass-card p-5 text-center card-hover relative overflow-hidden;
+  }
+
+  .stat-card::before {
+    content: "";
+    @apply absolute top-0 left-0 right-0 h-px;
+    background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.5), transparent);
+  }
+
+  .section-title {
+    @apply text-sm font-semibold text-gray-400 uppercase tracking-wider;
+  }
+
+  .badge {
+    @apply text-xs px-2.5 py-0.5 rounded-full font-medium;
+  }
+
+  .badge-active {
+    @apply badge bg-emerald-500/15 text-emerald-300 border border-emerald-500/20;
+  }
+
+  .badge-waiting {
+    @apply badge bg-amber-500/15 text-amber-300 border border-amber-500/20;
+  }
+
+  .badge-closed {
+    @apply badge bg-gray-700/50 text-gray-400 border border-gray-700;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .animate-in {
+    animation: fade-in-up 0.6s ease-out both;
+  }
+
+  .animate-in-delay-1 {
+    animation: fade-in-up 0.6s ease-out 0.1s both;
+  }
+
+  .animate-in-delay-2 {
+    animation: fade-in-up 0.6s ease-out 0.2s both;
+  }
+
+  .animate-in-delay-3 {
+    animation: fade-in-up 0.6s ease-out 0.3s both;
+  }
+
+  .noise-bg {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  }
+}
