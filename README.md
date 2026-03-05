@@ -62,7 +62,7 @@ npm install
 Create a file named `.env.local` in the project root:
 
 ```
-MONGODB_URI=mongodb://localhost:27017/p2p-quiz
+MONGODB_URI=mongodb://localhost:27017/qlaude
 REDIS_URL=redis://localhost:6379
 JWT_SECRET=<your-secret>
 JWT_REFRESH_SECRET=<your-secret>
