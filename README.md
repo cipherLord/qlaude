@@ -48,7 +48,7 @@ Qlaude is a real-time quiz platform where quizmasters host live quizzes for indi
 
 ```bash
 git clone <repo-url>
-cd p2p-quiz
+cd qlaude
 ```
 
 **2. Install dependencies**
