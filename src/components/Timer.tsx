@@ -5,9 +5,10 @@ import { useState, useEffect } from "react";
 interface TimerProps {
   endsAt: string;
   onExpired?: () => void;
+  size?: "default" | "sm";
 }
 
-export default function Timer({ endsAt, onExpired }: TimerProps) {
+export default function Timer({ endsAt, onExpired, size = "default" }: TimerProps) {
   const [remaining, setRemaining] = useState(0);
   const [total, setTotal] = useState(0);
 
@@ -49,6 +50,17 @@ export default function Timer({ endsAt, onExpired }: TimerProps) {
       : remaining <= 15
         ? "drop-shadow(0 0 4px rgba(245,158,11,0.3))"
         : "drop-shadow(0 0 4px rgba(16,185,129,0.3))";
+
+  if (size === "sm") {
+    return (
+      <span
+        className={`font-mono text-xs font-bold tabular-nums ${remaining <= 5 ? "animate-pulse" : ""}`}
+        style={{ color: urgencyColor }}
+      >
+        {minutes > 0 ? `${minutes}:${seconds.toString().padStart(2, "0")}` : `${seconds}s`}
+      </span>
+    );
+  }
 
   return (
     <div className="flex items-center gap-3">

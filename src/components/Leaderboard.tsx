@@ -110,7 +110,7 @@ export default function Leaderboard({
                 )}
               </span>
               <div className="text-right">
-                <span className="text-indigo-400 font-bold text-sm tabular-nums">
+                <span className={`font-bold text-sm tabular-nums ${entry.points < 0 ? "text-red-400" : "text-indigo-400"}`}>
                   {entry.points}
                 </span>
                 <span className="text-gray-600 text-xs ml-1">pts</span>

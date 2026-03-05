@@ -13,11 +13,22 @@ interface AnswerEntry {
   submittedAt: string;
 }
 
+interface PounceAnswerForMarking {
+  answerId: string;
+  teamId: string;
+  teamName: string;
+  text: string;
+}
+
 interface QuestionPanelProps {
   socket: Socket;
   incomingAnswers: AnswerEntry[];
   hasActiveQuestion: boolean;
   markedWrongIds: Set<string>;
+  scoringMode?: "normal" | "bounce" | "pounce_bounce";
+  questionPhase?: string | null;
+  isPounceMarkingPhase?: boolean;
+  pounceAnswersForMarking?: PounceAnswerForMarking[];
 }
 
 function formatAnswerText(text: string): string {
@@ -39,6 +50,10 @@ export default function QuestionPanel({
   incomingAnswers,
   hasActiveQuestion,
   markedWrongIds,
+  scoringMode = "normal",
+  questionPhase = null,
+  isPounceMarkingPhase = false,
+  pounceAnswersForMarking = [],
 }: QuestionPanelProps) {
   const [questionText, setQuestionText] = useState("");
   const [timerSeconds, setTimerSeconds] = useState(30);
@@ -292,6 +307,26 @@ export default function QuestionPanel({
         </div>
       )}
 
+      {scoringMode !== "normal" && questionPhase === "pounce" && hasActiveQuestion && (
+        <div className="glass-card p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-400" />
+              </span>
+              <span className="text-sm text-purple-300 font-medium">Pounce Window Open</span>
+            </div>
+            <button
+              onClick={() => socket.emit("advance-phase")}
+              className="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 px-4 py-1.5 rounded-lg text-xs font-medium transition-all duration-200"
+            >
+              Close Pounce &amp; Start Bounce
+            </button>
+          </div>
+        </div>
+      )}
+
       {incomingAnswers.length > 0 && (
         <div className="glass-card p-4">
           <div className="flex items-center gap-2 mb-3">
@@ -306,12 +341,16 @@ export default function QuestionPanel({
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {incomingAnswers.map((answer) => {
               const isWrong = markedWrongIds.has(answer.answerId);
+              const isPounce = (answer as AnswerEntry & { answerType?: string }).answerType === "pounce" ||
+                (!('answerType' in answer) && false);
               return (
                 <div
                   key={answer.answerId}
                   className={`flex items-start gap-3 rounded-xl p-3 transition-colors duration-200 ${
                     isWrong
                       ? "bg-red-500/5 border border-red-500/15 opacity-60"
+                      : isPounce
+                      ? "bg-purple-500/5 border border-purple-500/15"
                       : "bg-gray-800/30 hover:bg-gray-800/50"
                   }`}
                 >
@@ -323,14 +362,21 @@ export default function QuestionPanel({
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-500">
-                      {answer.teamName || answer.displayName}
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs text-gray-500">
+                        {answer.teamName || answer.displayName}
+                      </p>
+                      {isPounce && (
+                        <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-medium">
+                          Pounce
+                        </span>
+                      )}
+                    </div>
                     <p className={`text-sm mt-0.5 ${isWrong ? "text-gray-500 line-through" : "text-white"}`}>
                       {formatAnswerText(answer.text)}
                     </p>
                   </div>
-                  {!isWrong && (
+                  {!isWrong && !isPounce && (
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         onClick={() => handleMarkCorrect(answer.answerId)}
@@ -349,6 +395,41 @@ export default function QuestionPanel({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {isPounceMarkingPhase && pounceAnswersForMarking.length > 0 && (
+        <div className="glass-card p-4 border-purple-500/20">
+          <div className="flex items-center gap-2 mb-3">
+            <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <h3 className="section-title text-purple-300">Mark Pounce Answers</h3>
+          </div>
+          <div className="space-y-2">
+            {pounceAnswersForMarking.map((pa) => (
+              <div key={pa.answerId} className="flex items-start gap-3 bg-purple-500/5 border border-purple-500/15 rounded-xl p-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-purple-400">{pa.teamName}</p>
+                  <p className="text-sm text-white mt-0.5">{formatAnswerText(pa.text)}</p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => socket.emit("mark-pounce", { answerId: pa.answerId, isCorrect: true })}
+                    className="bg-emerald-600/15 hover:bg-emerald-600/30 text-emerald-300 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 border border-emerald-500/20"
+                  >
+                    Correct
+                  </button>
+                  <button
+                    onClick={() => socket.emit("mark-pounce", { answerId: pa.answerId, isCorrect: false })}
+                    className="bg-red-600/15 hover:bg-red-600/30 text-red-300 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 border border-red-500/20"
+                  >
+                    Wrong
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

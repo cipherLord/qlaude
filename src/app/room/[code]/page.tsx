@@ -11,6 +11,9 @@ import AnswerPanel from "@/components/AnswerPanel";
 import ParticipantList from "@/components/ParticipantList";
 import TeamChat from "@/components/TeamChat";
 import TeamSelector from "@/components/TeamSelector";
+import BounceStatusBar from "@/components/BounceStatusBar";
+import QuestionActivityLog from "@/components/QuestionActivityLog";
+import ScoringRulesPanel from "@/components/ScoringRulesPanel";
 
 function formatAnswerText(text: string): string {
   try {
@@ -33,6 +36,10 @@ interface RoomState {
   mode: "individual" | "team";
   status: string;
   isQuizmaster: boolean;
+  scoringMode?: "normal" | "bounce" | "pounce_bounce";
+  pouncePenalty?: number | null;
+  teamOrder?: { id: string; name: string }[] | null;
+  currentTeamIndex?: number;
 }
 
 interface QuestionState {
@@ -45,6 +52,28 @@ interface QuestionState {
   parts?: number;
   mediaUrl?: string | null;
   mediaType?: "image" | "video" | null;
+  assignedTeamId?: string | null;
+  questionPhase?: string | null;
+  currentBounceTeamId?: string | null;
+  attemptedTeamIds?: string[];
+  pouncedTeamIds?: string[];
+}
+
+export interface ActivityEntry {
+  type: string;
+  teamName?: string;
+  teamId?: string;
+  answerText?: string;
+  answerType?: string;
+  points?: number;
+  timestamp: number;
+}
+
+interface PounceAnswerForMarking {
+  answerId: string;
+  teamId: string;
+  teamName: string;
+  text: string;
 }
 
 interface AnswerEntry {
@@ -186,6 +215,12 @@ export default function RoomPage() {
   const [myTeam, setMyTeam] = useState<{ id: string; name: string; isCaptain: boolean } | null>(null);
   const [needsTeam, setNeedsTeam] = useState(false);
 
+  const [activityLog, setActivityLog] = useState<ActivityEntry[]>([]);
+  const [bounceEndsAt, setBounceEndsAt] = useState<string | null>(null);
+  const [pounceEndsAt, setPounceEndsAt] = useState<string | null>(null);
+  const [isPounceMarkingPhase, setIsPounceMarkingPhase] = useState(false);
+  const [pounceAnswersForMarking, setPounceAnswersForMarking] = useState<PounceAnswerForMarking[]>([]);
+
   const fetchRoomInfo = useCallback(async () => {
     try {
       const res = await fetch(`/api/rooms/${code}`);
@@ -244,12 +279,75 @@ export default function RoomPage() {
 
       socket.on("question-started", (data) => {
         setActiveQuestion(data.question);
-        setEndsAt(data.endsAt);
+        setEndsAt(data.endsAt || null);
+        setBounceEndsAt(data.endsAt || null);
+        setPounceEndsAt(data.pounceEndsAt || null);
         setTimerExpired(false);
         setHasSubmitted(false);
         setIncomingAnswers([]);
         setRevealedAnswers([]);
         setMarkedWrongIds(new Set());
+        setActivityLog([]);
+        setIsPounceMarkingPhase(false);
+        setPounceAnswersForMarking([]);
+      });
+
+      socket.on("team-order-set", (data) => {
+        setRoomState((prev) => prev ? { ...prev, teamOrder: data.teamOrder } : prev);
+      });
+
+      socket.on("phase-changed", (data) => {
+        setActiveQuestion((prev) => prev ? { ...prev, questionPhase: data.questionPhase, currentBounceTeamId: data.currentBounceTeamId } : prev);
+        setBounceEndsAt(data.endsAt || null);
+        setPounceEndsAt(null);
+      });
+
+      socket.on("bounce-advanced", (data) => {
+        setActiveQuestion((prev) => prev ? { ...prev, currentBounceTeamId: data.currentBounceTeamId, questionPhase: "bounce" } : prev);
+        setBounceEndsAt(data.endsAt || null);
+      });
+
+      socket.on("bounce-answer-submitted", (data) => {
+        setBounceEndsAt(null);
+        setIncomingAnswers((prev) => {
+          if (prev.some((a) => a.answerId === data.answerId)) return prev;
+          return [...prev, { answerId: data.answerId, teamId: data.teamId, teamName: data.teamName, text: data.text, submittedAt: new Date().toISOString() }];
+        });
+      });
+
+      socket.on("pounce-received", (data) => {
+        setIncomingAnswers((prev) => {
+          if (prev.some((a) => a.answerId === data.answerId)) return prev;
+          return [...prev, { answerId: data.answerId, teamId: data.teamId, teamName: data.teamName, text: data.text, submittedAt: new Date().toISOString() }];
+        });
+      });
+
+      socket.on("pounce-status-update", (data) => {
+        setActiveQuestion((prev) => prev ? { ...prev, pouncedTeamIds: data.pouncedTeamIds } : prev);
+      });
+
+      socket.on("activity-event", (data) => {
+        setActivityLog((prev) => [...prev, { ...data, timestamp: Date.now() }]);
+      });
+
+      socket.on("pounce-marking-phase", (data) => {
+        setIsPounceMarkingPhase(true);
+        setPounceAnswersForMarking(data.pounceAnswers || []);
+        setActiveQuestion(null);
+      });
+
+      socket.on("pounce-marked", () => {
+        // individual pounce marked, leaderboard will update after all done
+      });
+
+      socket.on("all-pounces-marked", () => {
+        setIsPounceMarkingPhase(false);
+        setPounceAnswersForMarking([]);
+      });
+
+      socket.on("question-resolved", () => {
+        setActiveQuestion(null);
+        setBounceEndsAt(null);
       });
 
       socket.on("answer-received", (data: AnswerEntry) => {
@@ -576,6 +674,19 @@ export default function RoomPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
+          {activeQuestion && roomState?.scoringMode && roomState.scoringMode !== "normal" && roomState.teamOrder && (
+            <BounceStatusBar
+              teamOrder={roomState.teamOrder}
+              currentBounceTeamId={activeQuestion.currentBounceTeamId || null}
+              assignedTeamId={activeQuestion.assignedTeamId || null}
+              attemptedTeamIds={activeQuestion.attemptedTeamIds || []}
+              pouncedTeamIds={activeQuestion.pouncedTeamIds || []}
+              questionPhase={activeQuestion.questionPhase || null}
+              bounceEndsAt={bounceEndsAt}
+              pounceEndsAt={pounceEndsAt}
+            />
+          )}
+
           {activeQuestion && (
             <div className="glass-card p-6 animate-scale-in">
               <div className="flex items-start justify-between mb-4">
@@ -592,6 +703,18 @@ export default function RoomPage() {
                     {activeQuestion.parts && activeQuestion.parts > 1 && (
                       <span className="badge bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">
                         {activeQuestion.parts} parts
+                      </span>
+                    )}
+                    {activeQuestion.questionPhase && (
+                      <span className={`badge border text-xs ${
+                        activeQuestion.questionPhase === "pounce" ? "bg-purple-500/15 text-purple-300 border-purple-500/20" :
+                        activeQuestion.questionPhase === "direct" ? "bg-blue-500/15 text-blue-300 border-blue-500/20" :
+                        activeQuestion.questionPhase === "bounce" ? "bg-amber-500/15 text-amber-300 border-amber-500/20" :
+                        "bg-gray-500/15 text-gray-300 border-gray-500/20"
+                      }`}>
+                        {activeQuestion.questionPhase === "pounce" ? "Pounce Window" :
+                         activeQuestion.questionPhase === "direct" ? "Direct Answer" :
+                         activeQuestion.questionPhase === "bounce" ? "Bounce" : "Resolved"}
                       </span>
                     )}
                   </div>
@@ -617,10 +740,10 @@ export default function RoomPage() {
                     </div>
                   )}
                 </div>
-                {endsAt && !timerExpired && (
+                {roomState?.scoringMode === "normal" && endsAt && !timerExpired && (
                   <Timer endsAt={endsAt} onExpired={() => setTimerExpired(true)} />
                 )}
-                {timerExpired && (
+                {roomState?.scoringMode === "normal" && timerExpired && (
                   <span className="text-red-400 font-semibold text-sm animate-pulse flex items-center gap-1.5">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -630,13 +753,21 @@ export default function RoomPage() {
                 )}
               </div>
 
-              {!roomState?.isQuizmaster && !timerExpired && (
+              {!roomState?.isQuizmaster && (
                 <AnswerPanel
                   socket={socketRef.current!}
                   hasSubmitted={hasSubmitted}
                   isCaptain={myTeam?.isCaptain ?? true}
                   isTeamMode={roomState?.mode === "team"}
                   parts={activeQuestion?.parts}
+                  scoringMode={roomState?.scoringMode || "normal"}
+                  questionPhase={activeQuestion?.questionPhase || null}
+                  currentBounceTeamId={activeQuestion?.currentBounceTeamId || null}
+                  assignedTeamId={activeQuestion?.assignedTeamId || null}
+                  myTeamId={myTeam?.id || null}
+                  pouncePenalty={roomState?.pouncePenalty || null}
+                  questionPoints={activeQuestion?.points || 10}
+                  timerExpired={timerExpired}
                 />
               )}
             </div>
@@ -648,7 +779,15 @@ export default function RoomPage() {
               incomingAnswers={incomingAnswers}
               hasActiveQuestion={!!activeQuestion && !timerExpired}
               markedWrongIds={markedWrongIds}
+              scoringMode={roomState?.scoringMode || "normal"}
+              questionPhase={activeQuestion?.questionPhase || null}
+              isPounceMarkingPhase={isPounceMarkingPhase}
+              pounceAnswersForMarking={pounceAnswersForMarking}
             />
+          )}
+
+          {roomState?.scoringMode && roomState.scoringMode !== "normal" && activityLog.length > 0 && (
+            <QuestionActivityLog entries={activityLog} />
           )}
 
           {revealedAnswers.length > 0 && (
@@ -842,6 +981,14 @@ export default function RoomPage() {
             mode={roomState?.mode || "individual"}
             currentUserId={user?.id}
           />
+
+          {roomState?.scoringMode && roomState.scoringMode !== "normal" && (
+            <ScoringRulesPanel
+              scoringMode={roomState.scoringMode}
+              pouncePenalty={roomState.pouncePenalty || null}
+              questionPoints={activeQuestion?.points || 10}
+            />
+          )}
 
           {roomState?.isQuizmaster && socketRef.current && !roomClosed && (
             <ParticipantList

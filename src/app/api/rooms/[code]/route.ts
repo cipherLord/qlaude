@@ -53,6 +53,8 @@ export async function GET(
         code: room.code,
         name: room.name,
         mode: room.mode,
+        scoringMode: (room as Record<string, unknown>).scoringMode || "normal",
+        pouncePenalty: (room as Record<string, unknown>).pouncePenalty || null,
         status: room.status,
         maxTeams: room.maxTeams,
         maxTeamSize: room.maxTeamSize,

@@ -1,5 +1,7 @@
 import mongoose, { Schema, Document, Types } from "mongoose";
 
+export type AnswerType = "direct" | "bounce" | "pounce";
+
 export interface IAnswer extends Document {
   _id: Types.ObjectId;
   questionId: Types.ObjectId;
@@ -8,6 +10,7 @@ export interface IAnswer extends Document {
   teamId: Types.ObjectId | null;
   text: string;
   isCorrect: boolean | null;
+  answerType: AnswerType;
   submittedAt: Date;
 }
 
@@ -34,6 +37,11 @@ const AnswerSchema = new Schema<IAnswer>({
   },
   text: { type: String, required: true, maxlength: 2000 },
   isCorrect: { type: Boolean, default: null },
+  answerType: {
+    type: String,
+    enum: ["direct", "bounce", "pounce"],
+    default: "direct",
+  },
   submittedAt: { type: Date, required: true, default: Date.now },
 });
 

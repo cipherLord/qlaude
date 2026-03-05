@@ -13,6 +13,8 @@ export default function CreateRoomModal({ onClose }: Props) {
   const [mode, setMode] = useState<"individual" | "team">("individual");
   const [maxTeams, setMaxTeams] = useState("");
   const [maxTeamSize, setMaxTeamSize] = useState("5");
+  const [scoringMode, setScoringMode] = useState<"normal" | "bounce" | "pounce_bounce">("normal");
+  const [pouncePenalty, setPouncePenalty] = useState("");
   const [expiresInMinutes, setExpiresInMinutes] = useState("120");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -31,6 +33,8 @@ export default function CreateRoomModal({ onClose }: Props) {
           mode,
           maxTeams: maxTeams ? parseInt(maxTeams) : null,
           maxTeamSize: parseInt(maxTeamSize),
+          scoringMode: mode === "team" ? scoringMode : "normal",
+          pouncePenalty: scoringMode === "pounce_bounce" && pouncePenalty ? parseInt(pouncePenalty) : null,
           expiresInMinutes: parseInt(expiresInMinutes),
         }),
       });
@@ -139,36 +143,102 @@ export default function CreateRoomModal({ onClose }: Props) {
           </div>
 
           {mode === "team" && (
-            <div className="grid grid-cols-2 gap-3 animate-slide-up">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Max Teams
-                </label>
-                <input
-                  type="number"
-                  value={maxTeams}
-                  onChange={(e) => setMaxTeams(e.target.value)}
-                  className="input-field"
-                  placeholder="Unlimited"
-                  min={2}
-                  max={200}
-                />
+            <>
+              <div className="grid grid-cols-2 gap-3 animate-slide-up">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                    Max Teams
+                  </label>
+                  <input
+                    type="number"
+                    value={maxTeams}
+                    onChange={(e) => setMaxTeams(e.target.value)}
+                    className="input-field"
+                    placeholder="Unlimited"
+                    min={2}
+                    max={200}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                    Team Size
+                  </label>
+                  <input
+                    type="number"
+                    value={maxTeamSize}
+                    onChange={(e) => setMaxTeamSize(e.target.value)}
+                    className="input-field"
+                    min={2}
+                    max={20}
+                    required
+                  />
+                </div>
               </div>
-              <div>
+
+              <div className="animate-slide-up">
                 <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Team Size
+                  Scoring Mode
                 </label>
-                <input
-                  type="number"
-                  value={maxTeamSize}
-                  onChange={(e) => setMaxTeamSize(e.target.value)}
-                  className="input-field"
-                  min={2}
-                  max={20}
-                  required
-                />
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setScoringMode("normal")}
+                    className={`px-3 py-3 rounded-xl border text-sm font-medium transition-all duration-200 text-left ${
+                      scoringMode === "normal"
+                        ? "bg-indigo-600/15 border-indigo-500/40 text-indigo-300 shadow-lg shadow-indigo-500/5"
+                        : "bg-gray-800/40 border-gray-700/60 text-gray-400 hover:border-gray-600 hover:text-gray-300"
+                    }`}
+                  >
+                    <div className="font-semibold mb-0.5">Normal</div>
+                    <p className="text-[10px] opacity-60 leading-tight">All teams answer at once</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScoringMode("bounce")}
+                    className={`px-3 py-3 rounded-xl border text-sm font-medium transition-all duration-200 text-left ${
+                      scoringMode === "bounce"
+                        ? "bg-amber-600/15 border-amber-500/40 text-amber-300 shadow-lg shadow-amber-500/5"
+                        : "bg-gray-800/40 border-gray-700/60 text-gray-400 hover:border-gray-600 hover:text-gray-300"
+                    }`}
+                  >
+                    <div className="font-semibold mb-0.5">Bounce</div>
+                    <p className="text-[10px] opacity-60 leading-tight">Round-robin, pass to next</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScoringMode("pounce_bounce")}
+                    className={`px-3 py-3 rounded-xl border text-sm font-medium transition-all duration-200 text-left ${
+                      scoringMode === "pounce_bounce"
+                        ? "bg-purple-600/15 border-purple-500/40 text-purple-300 shadow-lg shadow-purple-500/5"
+                        : "bg-gray-800/40 border-gray-700/60 text-gray-400 hover:border-gray-600 hover:text-gray-300"
+                    }`}
+                  >
+                    <div className="font-semibold mb-0.5">Pounce + Bounce</div>
+                    <p className="text-[10px] opacity-60 leading-tight">Risk pounce, then bounce</p>
+                  </button>
+                </div>
               </div>
-            </div>
+
+              {scoringMode === "pounce_bounce" && (
+                <div className="animate-slide-up">
+                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                    Pounce Penalty
+                  </label>
+                  <input
+                    type="number"
+                    value={pouncePenalty}
+                    onChange={(e) => setPouncePenalty(e.target.value)}
+                    className="input-field"
+                    placeholder="Same as question points"
+                    min={1}
+                    max={100}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Points deducted for wrong pounce. Leave blank to match question points.
+                  </p>
+                </div>
+              )}
+            </>
           )}
 
           <div>

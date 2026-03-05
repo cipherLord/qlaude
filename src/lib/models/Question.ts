@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document, Types } from "mongoose";
 
 export type QuestionStatus = "pending" | "active" | "closed";
+export type QuestionPhase = "pounce" | "direct" | "bounce" | "resolved" | null;
 
 export interface IQuestion extends Document {
   _id: Types.ObjectId;
@@ -14,6 +15,11 @@ export interface IQuestion extends Document {
   correctAnswer: string | null;
   mediaUrl: string | null;
   mediaType: "image" | "video" | null;
+  assignedTeamId: Types.ObjectId | null;
+  questionPhase: QuestionPhase;
+  currentBounceTeamId: Types.ObjectId | null;
+  attemptedTeamIds: Types.ObjectId[];
+  pouncedTeamIds: Types.ObjectId[];
   createdAt: Date;
 }
 
@@ -37,6 +43,15 @@ const QuestionSchema = new Schema<IQuestion>(
     correctAnswer: { type: String, default: null },
     mediaUrl: { type: String, default: null },
     mediaType: { type: String, enum: ["image", "video", null], default: null },
+    assignedTeamId: { type: Schema.Types.ObjectId, ref: "Team", default: null },
+    questionPhase: {
+      type: String,
+      enum: ["pounce", "direct", "bounce", "resolved", null],
+      default: null,
+    },
+    currentBounceTeamId: { type: Schema.Types.ObjectId, ref: "Team", default: null },
+    attemptedTeamIds: [{ type: Schema.Types.ObjectId, ref: "Team" }],
+    pouncedTeamIds: [{ type: Schema.Types.ObjectId, ref: "Team" }],
   },
   { timestamps: true }
 );

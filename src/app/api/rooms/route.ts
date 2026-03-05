@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, mode, maxTeams, maxTeamSize, expiresInMinutes } = body;
+    const { name, mode, maxTeams, maxTeamSize, expiresInMinutes, scoringMode, pouncePenalty } = body;
 
     if (!name || !mode) {
       return NextResponse.json(
@@ -31,6 +31,15 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    const validScoringModes = ["normal", "bounce", "pounce_bounce"];
+    const resolvedScoringMode = mode === "team" && scoringMode && validScoringModes.includes(scoringMode)
+      ? scoringMode
+      : "normal";
+
+    const resolvedPouncePenalty = resolvedScoringMode === "pounce_bounce" && pouncePenalty && Number(pouncePenalty) > 0
+      ? Number(pouncePenalty)
+      : null;
 
     const expMinutes = expiresInMinutes || 120;
     if (expMinutes < 10 || expMinutes > 1440) {
@@ -60,6 +69,8 @@ export async function POST(req: NextRequest) {
       name: name.trim(),
       quizmasterId: authUser.userId,
       mode,
+      scoringMode: resolvedScoringMode,
+      pouncePenalty: resolvedPouncePenalty,
       maxTeams: mode === "team" ? maxTeams || null : null,
       maxTeamSize: mode === "team" ? maxTeamSize || 5 : 1,
       expiresAt: new Date(Date.now() + expMinutes * 60 * 1000),
@@ -71,6 +82,8 @@ export async function POST(req: NextRequest) {
         code: room.code,
         name: room.name,
         mode: room.mode,
+        scoringMode: room.scoringMode,
+        pouncePenalty: room.pouncePenalty,
         status: room.status,
         maxTeams: room.maxTeams,
         maxTeamSize: room.maxTeamSize,

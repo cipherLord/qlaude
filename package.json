@@ -7,7 +7,12 @@
     "dev:next": "next dev",
     "build": "next build",
     "start": "NODE_ENV=production node server.mjs",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "jest --forceExit",
+    "test:watch": "jest --watch --forceExit",
+    "test:e2e": "npx playwright test --config=e2e/playwright.config.ts --project=chromium",
+    "test:e2e:ui": "npx playwright test --config=e2e/playwright.config.ts --project=chromium --ui",
+    "test:e2e:headed": "npx playwright test --config=e2e/playwright.config.ts --project=chromium --headed"
   },
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",
@@ -23,13 +28,19 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@babel/preset-env": "^7.29.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
+    "jest": "^30.2.0",
+    "mongodb-memory-server": "^11.0.1",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
+    "@playwright/test": "^1.58.2",
+    "ts-jest": "^29.4.6",
     "typescript": "^5"
   }
 }
