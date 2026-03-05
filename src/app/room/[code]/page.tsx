@@ -765,6 +765,7 @@ export default function RoomPage() {
                   currentBounceTeamId={activeQuestion?.currentBounceTeamId || null}
                   assignedTeamId={activeQuestion?.assignedTeamId || null}
                   myTeamId={myTeam?.id || null}
+                  myUserId={user?.id || null}
                   pouncePenalty={roomState?.pouncePenalty || null}
                   questionPoints={activeQuestion?.points || 10}
                   timerExpired={timerExpired}

@@ -26,12 +26,12 @@ export async function createRoomViaUI(
   if (options.mode === "team") {
     await modal.locator('button[type="button"]:has-text("Teams")').click();
     await page.waitForTimeout(300);
+  }
 
-    if (options.scoringMode === "bounce") {
-      await modal.locator('button[type="button"] >> text=Bounce').first().click();
-    } else if (options.scoringMode === "pounce_bounce") {
-      await modal.locator('button[type="button"]:has-text("Pounce + Bounce")').click();
-    }
+  if (options.scoringMode === "bounce") {
+    await modal.locator('button[type="button"] >> text=Bounce').first().click();
+  } else if (options.scoringMode === "pounce_bounce") {
+    await modal.locator('button[type="button"]:has-text("Pounce + Bounce")').click();
   }
 
   await modal.locator('button[type="submit"]').click();

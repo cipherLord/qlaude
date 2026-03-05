@@ -14,6 +14,7 @@ interface AnswerPanelProps {
   currentBounceTeamId?: string | null;
   assignedTeamId?: string | null;
   myTeamId?: string | null;
+  myUserId?: string | null;
   pouncePenalty?: number | null;
   questionPoints?: number;
   timerExpired?: boolean;
@@ -30,6 +31,7 @@ export default function AnswerPanel({
   currentBounceTeamId = null,
   assignedTeamId = null,
   myTeamId = null,
+  myUserId = null,
   pouncePenalty = null,
   questionPoints = 10,
   timerExpired = false,
@@ -52,8 +54,9 @@ export default function AnswerPanel({
 
   const canAnswer = isTeamMode ? isCaptain : true;
   const isBounce = scoringMode === "bounce" || scoringMode === "pounce_bounce";
-  const isMyTurn = isBounce && myTeamId && currentBounceTeamId === myTeamId;
-  const isAssignedTeam = isBounce && myTeamId && assignedTeamId === myTeamId;
+  const myEntityId = isTeamMode ? myTeamId : myUserId;
+  const isMyTurn = isBounce && myEntityId && currentBounceTeamId === myEntityId;
+  const isAssignedTeam = isBounce && myEntityId && assignedTeamId === myEntityId;
   const canPounce = scoringMode === "pounce_bounce" && questionPhase === "pounce" && !isAssignedTeam && canAnswer;
 
   const hasContent = parts > 1

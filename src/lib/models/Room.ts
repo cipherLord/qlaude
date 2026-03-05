@@ -16,6 +16,7 @@ export interface IRoom extends Document {
   maxTeamSize: number;
   bannedUserIds: Types.ObjectId[];
   teamOrder: Types.ObjectId[];
+  playerOrder: Types.ObjectId[];
   currentTeamIndex: number;
   expiresAt: Date;
   status: RoomStatus;
@@ -52,6 +53,7 @@ const RoomSchema = new Schema<IRoom>(
     maxTeamSize: { type: Number, default: 5 },
     bannedUserIds: [{ type: Schema.Types.ObjectId, ref: "User" }],
     teamOrder: [{ type: Schema.Types.ObjectId, ref: "Team" }],
+    playerOrder: [{ type: Schema.Types.ObjectId, ref: "User" }],
     currentTeamIndex: { type: Number, default: 0 },
     expiresAt: { type: Date, required: true },
     status: {

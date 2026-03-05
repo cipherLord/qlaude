@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     const validScoringModes = ["normal", "bounce", "pounce_bounce"];
-    const resolvedScoringMode = mode === "team" && scoringMode && validScoringModes.includes(scoringMode)
+    const resolvedScoringMode = scoringMode && validScoringModes.includes(scoringMode)
       ? scoringMode
       : "normal";
 

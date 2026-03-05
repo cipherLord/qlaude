@@ -37,6 +37,7 @@ async function ensureModels() {
       maxTeamSize: { type: Number, default: 5 },
       bannedUserIds: [{ type: Schema.Types.ObjectId, ref: "User" }],
       teamOrder: [{ type: Schema.Types.ObjectId, ref: "Team" }],
+      playerOrder: [{ type: Schema.Types.ObjectId, ref: "User" }],
       currentTeamIndex: { type: Number, default: 0 },
       expiresAt: { type: Date, required: true },
       status: { type: String, enum: ["waiting", "active", "closed"], default: "waiting" },
@@ -190,6 +191,57 @@ function findNextBounceTeamId(room, question) {
   return null;
 }
 
+function isIndividualBounce(room) {
+  return room.mode === "individual" && isBounceMode(room);
+}
+
+function getOrder(room) {
+  return room.mode === "team" ? room.teamOrder : room.playerOrder;
+}
+
+function findNextBouncePlayerId(room, question) {
+  const order = (room.playerOrder || []).map(id => id.toString());
+  const attempted = new Set(question.attemptedTeamIds.map(id => id.toString()));
+  const pounced = new Set(question.pouncedTeamIds.map(id => id.toString()));
+  const currentId = question.currentBounceTeamId?.toString();
+  const currentIdx = order.indexOf(currentId);
+
+  for (let offset = 1; offset < order.length; offset++) {
+    const idx = (currentIdx + offset) % order.length;
+    const playerId = order[idx];
+    if (attempted.has(playerId)) continue;
+    if (room.scoringMode === "pounce_bounce" && pounced.has(playerId)) continue;
+    return playerId;
+  }
+  return null;
+}
+
+function findNextBounceId(room, question) {
+  return room.mode === "team"
+    ? findNextBounceTeamId(room, question)
+    : findNextBouncePlayerId(room, question);
+}
+
+async function getEntityName(room, entityId) {
+  if (room.mode === "team") {
+    return getTeamNameById(entityId);
+  }
+  const u = await User.findById(entityId).select("displayName").lean();
+  return u?.displayName || "Unknown";
+}
+
+async function buildOrderWithNames(room) {
+  if (room.mode === "team") {
+    return buildTeamOrderWithNames(room.teamOrder);
+  }
+  return Promise.all(
+    (room.playerOrder || []).map(async (id) => {
+      const u = await User.findById(id).select("displayName").lean();
+      return { id: id.toString(), name: u?.displayName || "Unknown" };
+    })
+  );
+}
+
 async function buildLeaderboard(roomId) {
   const scores = await Score.find({ roomId }).sort({ points: -1 }).limit(50).lean();
   return Promise.all(
@@ -235,21 +287,21 @@ function startBounceTimerForTeam(io, roomCode, question, timerSeconds) {
       const freshRoom = await Room.findOne({ code: roomCode });
       if (!freshRoom) return;
 
-      const timedOutTeamId = freshQ.currentBounceTeamId?.toString();
-      const timedOutName = await getTeamNameById(timedOutTeamId);
+      const timedOutId = freshQ.currentBounceTeamId?.toString();
+      const timedOutName = await getEntityName(freshRoom, timedOutId);
 
       io.to(`room:${roomCode}`).emit("activity-event", {
-        type: "timed_out", teamName: timedOutName, teamId: timedOutTeamId,
+        type: "timed_out", teamName: timedOutName, teamId: timedOutId,
       });
 
-      const nextTeamId = findNextBounceTeamId(freshRoom, freshQ);
-      if (nextTeamId) {
-        freshQ.currentBounceTeamId = nextTeamId;
+      const nextId = findNextBounceId(freshRoom, freshQ);
+      if (nextId) {
+        freshQ.currentBounceTeamId = nextId;
         await freshQ.save();
-        const nextName = await getTeamNameById(nextTeamId);
+        const nextName = await getEntityName(freshRoom, nextId);
         const nextEndsAt = new Date(Date.now() + freshQ.timerSeconds * 1000);
         io.to(`room:${roomCode}`).emit("bounce-advanced", {
-          currentBounceTeamId: nextTeamId, currentBounceTeamName: nextName,
+          currentBounceTeamId: nextId, currentBounceTeamName: nextName,
           endsAt: nextEndsAt.toISOString(),
         });
         startBounceTimerForTeam(io, roomCode, freshQ, freshQ.timerSeconds);
@@ -271,8 +323,7 @@ async function handleQuestionExhausted(io, roomCode, room, question) {
   await question.save();
   clearAllQuestionTimers(roomCode);
 
-  // Advance round-robin by 1 from assigned team
-  const order = room.teamOrder.map(id => id.toString());
+  const order = getOrder(room).map(id => id.toString());
   const assignedIdx = order.indexOf(question.assignedTeamId?.toString());
   room.currentTeamIndex = (assignedIdx + 1) % order.length;
   await room.save();
@@ -283,8 +334,9 @@ async function handleQuestionExhausted(io, roomCode, room, question) {
 
   if (room.scoringMode === "pounce_bounce" && pounceAnswers.length > 0) {
     const pounceData = await Promise.all(pounceAnswers.map(async (a) => {
-      const tName = await getTeamNameById(a.teamId);
-      return { answerId: a._id, teamId: a.teamId?.toString(), teamName: tName, text: a.text };
+      const entityId = room.mode === "team" ? a.teamId : a.userId;
+      const eName = await getEntityName(room, entityId);
+      return { answerId: a._id, teamId: entityId?.toString(), teamName: eName, text: a.text };
     }));
     io.to(`room:${roomCode}`).emit("pounce-marking-phase", {
       questionId: question._id, pounceAnswers: pounceData,
@@ -351,7 +403,7 @@ export function registerQuizHandlers(io, socket) {
       if (!isRoomClosed) {
         await Participation.findOneAndUpdate(
           { userId, roomId: room._id },
-          { $setOnInsert: { role, joinedAt: new Date() } },
+          { $setOnInsert: { role, joinedAt: new Date() }, $set: { leftAt: null } },
           { upsert: true }
         );
       }
@@ -360,8 +412,11 @@ export function registerQuizHandlers(io, socket) {
       const populatedScores = await buildLeaderboard(room._id);
 
       let teamOrderWithNames = null;
-      if (isBounceMode(room) && room.teamOrder?.length > 0) {
-        teamOrderWithNames = await buildTeamOrderWithNames(room.teamOrder);
+      if (isBounceMode(room)) {
+        const order = getOrder(room);
+        if (order?.length > 0) {
+          teamOrderWithNames = await buildOrderWithNames(room);
+        }
       }
 
       socket.emit("room-state", {
@@ -457,8 +512,7 @@ export function registerQuizHandlers(io, socket) {
 
       const bounce = isBounceMode(room);
 
-      // Initialize team order on first bounce/pounce question
-      if (bounce && (!room.teamOrder || room.teamOrder.length === 0)) {
+      if (bounce && room.mode === "team" && (!room.teamOrder || room.teamOrder.length === 0)) {
         const teams = await Team.find({ roomId: room._id, status: "active" }).select("_id").lean();
         if (teams.length < 2) {
           return socket.emit("error", { message: "Need at least 2 active teams for bounce mode" });
@@ -470,12 +524,29 @@ export function registerQuizHandlers(io, socket) {
         io.to(`room:${roomCode}`).emit("team-order-set", { teamOrder: orderWithNames });
       }
 
+      if (bounce && room.mode === "individual" && (!room.playerOrder || room.playerOrder.length === 0)) {
+        const bannedSet = new Set((room.bannedUserIds || []).map(id => id.toString()));
+        const participants = await Participation.find({
+          roomId: room._id, role: "individual",
+        }).select("userId").lean();
+        const activePlayers = participants.filter(p => !bannedSet.has(p.userId.toString()));
+        if (activePlayers.length < 2) {
+          return socket.emit("error", { message: "Need at least 2 players for bounce mode" });
+        }
+        room.playerOrder = shuffleArray(activePlayers.map(p => p.userId));
+        room.currentTeamIndex = 0;
+        await room.save();
+        const orderWithNames = await buildOrderWithNames(room);
+        io.to(`room:${roomCode}`).emit("team-order-set", { teamOrder: orderWithNames });
+      }
+
       let assignedTeamId = null;
       let questionPhase = null;
       let currentBounceTeamId = null;
 
       if (bounce) {
-        assignedTeamId = room.teamOrder[room.currentTeamIndex];
+        const order = getOrder(room);
+        assignedTeamId = order[room.currentTeamIndex];
         currentBounceTeamId = assignedTeamId;
         questionPhase = room.scoringMode === "pounce_bounce" ? "pounce" : "direct";
       }
@@ -499,11 +570,10 @@ export function registerQuizHandlers(io, socket) {
       });
 
       if (bounce) {
-        const assignedName = await getTeamNameById(assignedTeamId);
+        const assignedName = await getEntityName(room, assignedTeamId);
         let bounceEndsAt = null;
 
         if (questionPhase === "pounce") {
-          // Pounce window uses half the timer (min 10s)
           const pounceTime = Math.max(10, Math.floor(validTimer / 2));
           const pounceEndsAt = new Date(Date.now() + pounceTime * 1000);
           const pounceKey = `room:${roomCode}:pounce-timer`;
@@ -514,6 +584,7 @@ export function registerQuizHandlers(io, socket) {
               if (!freshQ || freshQ.questionPhase !== "pounce") return;
               freshQ.questionPhase = "direct";
               await freshQ.save();
+              const freshRoom = await Room.findOne({ code: roomCode });
               const bEndsAt = startBounceTimerForTeam(io, roomCode, freshQ, validTimer);
               io.to(`room:${roomCode}`).emit("phase-changed", {
                 questionPhase: "direct",
@@ -626,37 +697,46 @@ export function registerQuizHandlers(io, socket) {
       const bounce = isBounceMode(room);
 
       if (bounce) {
-        // ---- Bounce/Pounce mode submit ----
         const phase = activeQuestion.questionPhase;
         if (phase !== "direct" && phase !== "bounce") {
           return socket.emit("answer-rejected", { reason: "Not in answering phase" });
         }
 
-        const team = await Team.findOne({ roomId: room._id, memberIds: userId, status: "active" });
-        if (!team) return socket.emit("answer-rejected", { reason: "Not in a team" });
-        if (team.captainId.toString() !== userId) {
-          return socket.emit("answer-rejected", { reason: "Only captain can submit" });
+        let entityId, entityName;
+
+        if (room.mode === "team") {
+          const team = await Team.findOne({ roomId: room._id, memberIds: userId, status: "active" });
+          if (!team) return socket.emit("answer-rejected", { reason: "Not in a team" });
+          if (team.captainId.toString() !== userId) {
+            return socket.emit("answer-rejected", { reason: "Only captain can submit" });
+          }
+          entityId = team._id;
+          entityName = team.name;
+        } else {
+          entityId = userId;
+          const u = await User.findById(userId).select("displayName").lean();
+          entityName = u?.displayName || "Unknown";
         }
 
-        if (activeQuestion.attemptedTeamIds.some(id => id.toString() === team._id.toString())) {
+        if (activeQuestion.attemptedTeamIds.some(id => id.toString() === entityId.toString())) {
           return socket.emit("answer-rejected", { reason: "No reattempts allowed" });
         }
 
-        if (activeQuestion.currentBounceTeamId?.toString() !== team._id.toString()) {
+        if (activeQuestion.currentBounceTeamId?.toString() !== entityId.toString()) {
           return socket.emit("answer-rejected", { reason: "Not your turn" });
         }
 
         clearBounceTimer(roomCode);
 
-        const answerType = activeQuestion.assignedTeamId?.toString() === team._id.toString() ? "direct" : "bounce";
-        activeQuestion.attemptedTeamIds.push(team._id);
+        const answerType = activeQuestion.assignedTeamId?.toString() === entityId.toString() ? "direct" : "bounce";
+        activeQuestion.attemptedTeamIds.push(entityId);
         await activeQuestion.save();
 
         const answer = await Answer.create({
           questionId: activeQuestion._id,
           roomId: room._id,
           userId,
-          teamId: team._id,
+          teamId: room.mode === "team" ? entityId : null,
           text: text.substring(0, 2000),
           answerType,
           submittedAt: new Date(),
@@ -669,16 +749,16 @@ export function registerQuizHandlers(io, socket) {
 
         io.to(`room:${roomCode}`).emit("bounce-answer-submitted", {
           answerId: answer._id.toString(),
-          teamId: team._id.toString(),
-          teamName: team.name,
+          teamId: entityId.toString(),
+          teamName: entityName,
           text: answer.text,
           answerType,
         });
 
         io.to(`room:${roomCode}`).emit("activity-event", {
           type: "answer_submitted",
-          teamName: team.name,
-          teamId: team._id.toString(),
+          teamName: entityName,
+          teamId: entityId.toString(),
           answerText: answer.text,
           answerType,
         });
@@ -775,28 +855,38 @@ export function registerQuizHandlers(io, socket) {
         return socket.emit("answer-rejected", { reason: "Pounce window closed" });
       }
 
-      const team = await Team.findOne({ roomId: room._id, memberIds: userId, status: "active" });
-      if (!team) return socket.emit("answer-rejected", { reason: "Not in a team" });
-      if (team.captainId.toString() !== userId) {
-        return socket.emit("answer-rejected", { reason: "Only captain can pounce" });
+      let entityId, entityName;
+
+      if (room.mode === "team") {
+        const team = await Team.findOne({ roomId: room._id, memberIds: userId, status: "active" });
+        if (!team) return socket.emit("answer-rejected", { reason: "Not in a team" });
+        if (team.captainId.toString() !== userId) {
+          return socket.emit("answer-rejected", { reason: "Only captain can pounce" });
+        }
+        entityId = team._id;
+        entityName = team.name;
+      } else {
+        entityId = userId;
+        const u = await User.findById(userId).select("displayName").lean();
+        entityName = u?.displayName || "Unknown";
       }
 
-      if (activeQuestion.assignedTeamId?.toString() === team._id.toString()) {
-        return socket.emit("answer-rejected", { reason: "Assigned team cannot pounce" });
+      if (activeQuestion.assignedTeamId?.toString() === entityId.toString()) {
+        return socket.emit("answer-rejected", { reason: "Assigned player cannot pounce" });
       }
 
-      if (activeQuestion.pouncedTeamIds.some(id => id.toString() === team._id.toString())) {
+      if (activeQuestion.pouncedTeamIds.some(id => id.toString() === entityId.toString())) {
         return socket.emit("answer-rejected", { reason: "Already pounced" });
       }
 
-      activeQuestion.pouncedTeamIds.push(team._id);
+      activeQuestion.pouncedTeamIds.push(entityId);
       await activeQuestion.save();
 
       const answer = await Answer.create({
         questionId: activeQuestion._id,
         roomId: room._id,
         userId,
-        teamId: team._id,
+        teamId: room.mode === "team" ? entityId : null,
         text: text.substring(0, 2000),
         answerType: "pounce",
         submittedAt: new Date(),
@@ -804,20 +894,18 @@ export function registerQuizHandlers(io, socket) {
 
       await Participation.findOneAndUpdate({ userId, roomId: room._id }, { $inc: { answersGiven: 1 } });
 
-      // Notify QM with answer text
       const qmSockets = await io.in(`room:${roomCode}`).fetchSockets();
       for (const s of qmSockets) {
         if (s.data.userId === room.quizmasterId.toString()) {
           s.emit("pounce-received", {
-            answerId: answer._id.toString(), teamId: team._id.toString(),
-            teamName: team.name, text: answer.text,
+            answerId: answer._id.toString(), teamId: entityId.toString(),
+            teamName: entityName, text: answer.text,
           });
         }
       }
 
-      // Broadcast to all WITHOUT the answer text
       io.to(`room:${roomCode}`).emit("activity-event", {
-        type: "team_pounced", teamName: team.name, teamId: team._id.toString(),
+        type: "team_pounced", teamName: entityName, teamId: entityId.toString(),
       });
 
       io.to(`room:${roomCode}`).emit("pounce-status-update", {
@@ -845,29 +933,39 @@ export function registerQuizHandlers(io, socket) {
       if (!activeQuestion) return;
       if (activeQuestion.questionPhase !== "direct" && activeQuestion.questionPhase !== "bounce") return;
 
-      const team = await Team.findOne({ roomId: room._id, memberIds: userId, status: "active" });
-      if (!team || team.captainId.toString() !== userId) return;
-      if (activeQuestion.currentBounceTeamId?.toString() !== team._id.toString()) return;
+      let entityId, entityName;
+      if (room.mode === "team") {
+        const team = await Team.findOne({ roomId: room._id, memberIds: userId, status: "active" });
+        if (!team || team.captainId.toString() !== userId) return;
+        entityId = team._id;
+        entityName = team.name;
+      } else {
+        entityId = userId;
+        const u = await User.findById(userId).select("displayName").lean();
+        entityName = u?.displayName || "Unknown";
+      }
+
+      if (activeQuestion.currentBounceTeamId?.toString() !== entityId.toString()) return;
 
       clearBounceTimer(roomCode);
 
       io.to(`room:${roomCode}`).emit("activity-event", {
-        type: "team_passed", teamName: team.name, teamId: team._id.toString(),
+        type: "team_passed", teamName: entityName, teamId: entityId.toString(),
       });
 
-      const nextTeamId = findNextBounceTeamId(room, activeQuestion);
-      if (nextTeamId) {
-        activeQuestion.currentBounceTeamId = nextTeamId;
+      const nextId = findNextBounceId(room, activeQuestion);
+      if (nextId) {
+        activeQuestion.currentBounceTeamId = nextId;
         activeQuestion.questionPhase = "bounce";
         await activeQuestion.save();
-        const nextName = await getTeamNameById(nextTeamId);
+        const nextName = await getEntityName(room, nextId);
         const endsAt = startBounceTimerForTeam(io, roomCode, activeQuestion, activeQuestion.timerSeconds);
         io.to(`room:${roomCode}`).emit("bounce-advanced", {
-          currentBounceTeamId: nextTeamId, currentBounceTeamName: nextName,
+          currentBounceTeamId: nextId, currentBounceTeamName: nextName,
           endsAt: endsAt.toISOString(),
         });
         io.to(`room:${roomCode}`).emit("activity-event", {
-          type: "team_answering", teamName: nextName, teamId: nextTeamId,
+          type: "team_answering", teamName: nextName, teamId: nextId,
         });
       } else {
         await handleQuestionExhausted(io, roomCode, room, activeQuestion);
@@ -894,7 +992,7 @@ export function registerQuizHandlers(io, socket) {
       activeQuestion.questionPhase = "direct";
       await activeQuestion.save();
 
-      const assignedName = await getTeamNameById(activeQuestion.currentBounceTeamId);
+      const assignedName = await getEntityName(room, activeQuestion.currentBounceTeamId);
       const endsAt = startBounceTimerForTeam(io, roomCode, activeQuestion, activeQuestion.timerSeconds);
 
       io.to(`room:${roomCode}`).emit("phase-changed", {
@@ -962,15 +1060,15 @@ export function registerQuizHandlers(io, socket) {
         question.status = "closed";
         await question.save();
 
-        const teamName = await getTeamNameById(answer.teamId);
+        const entityId = room.mode === "team" ? answer.teamId : answer.userId;
+        const entityName = await getEntityName(room, entityId);
         io.to(`room:${roomCode}`).emit("activity-event", {
-          type: "answer_correct", teamName, teamId: answer.teamId?.toString(),
+          type: "answer_correct", teamName: entityName, teamId: entityId?.toString(),
           points: pts, answerType: answer.answerType,
         });
 
-        // Advance round-robin
-        const order = room.teamOrder.map(id => id.toString());
-        const answeringIdx = order.indexOf(answer.teamId?.toString());
+        const order = getOrder(room).map(id => id.toString());
+        const answeringIdx = order.indexOf(entityId?.toString());
         room.currentTeamIndex = answeringIdx >= 0 ? (answeringIdx + 1) % order.length : (room.currentTeamIndex + 1) % order.length;
         await room.save();
 
@@ -1048,24 +1146,25 @@ export function registerQuizHandlers(io, socket) {
       const bounce = isBounceMode(room);
 
       if (bounce && question && question.status === "active" && (answer.answerType === "direct" || answer.answerType === "bounce")) {
-        const teamName = await getTeamNameById(answer.teamId);
+        const entityId = room.mode === "team" ? answer.teamId : answer.userId;
+        const entityName = await getEntityName(room, entityId);
         io.to(`room:${roomCode}`).emit("activity-event", {
-          type: "answer_wrong", teamName, teamId: answer.teamId?.toString(), answerType: answer.answerType,
+          type: "answer_wrong", teamName: entityName, teamId: entityId?.toString(), answerType: answer.answerType,
         });
 
-        const nextTeamId = findNextBounceTeamId(room, question);
-        if (nextTeamId) {
-          question.currentBounceTeamId = nextTeamId;
+        const nextId = findNextBounceId(room, question);
+        if (nextId) {
+          question.currentBounceTeamId = nextId;
           question.questionPhase = "bounce";
           await question.save();
-          const nextName = await getTeamNameById(nextTeamId);
+          const nextName = await getEntityName(room, nextId);
           const endsAt = startBounceTimerForTeam(io, roomCode, question, question.timerSeconds);
           io.to(`room:${roomCode}`).emit("bounce-advanced", {
-            currentBounceTeamId: nextTeamId, currentBounceTeamName: nextName,
+            currentBounceTeamId: nextId, currentBounceTeamName: nextName,
             endsAt: endsAt.toISOString(),
           });
           io.to(`room:${roomCode}`).emit("activity-event", {
-            type: "team_answering", teamName: nextName, teamId: nextTeamId,
+            type: "team_answering", teamName: nextName, teamId: nextId,
           });
         } else {
           await handleQuestionExhausted(io, roomCode, room, question);
@@ -1106,39 +1205,56 @@ export function registerQuizHandlers(io, socket) {
 
       const pts = question.points || 10;
       const penalty = room.pouncePenalty || pts;
-      const teamName = await getTeamNameById(answer.teamId);
+      const entityId = room.mode === "team" ? answer.teamId : answer.userId;
+      const entityName = await getEntityName(room, entityId);
 
       if (isCorrect) {
-        await Score.findOneAndUpdate(
-          { roomId: room._id, teamId: answer.teamId },
-          { $inc: { points: pts, correctCount: 1 } },
-          { upsert: true }
-        );
+        if (room.mode === "team" && answer.teamId) {
+          await Score.findOneAndUpdate(
+            { roomId: room._id, teamId: answer.teamId },
+            { $inc: { points: pts, correctCount: 1 } },
+            { upsert: true }
+          );
+        } else {
+          await Score.findOneAndUpdate(
+            { roomId: room._id, userId: answer.userId },
+            { $inc: { points: pts, correctCount: 1 } },
+            { upsert: true }
+          );
+        }
         await Participation.findOneAndUpdate(
           { userId: answer.userId, roomId: room._id },
           { $inc: { correctAnswers: 1, totalPoints: pts } }
         );
         io.to(`room:${roomCode}`).emit("activity-event", {
-          type: "pounce_correct", teamName, teamId: answer.teamId?.toString(), points: pts,
+          type: "pounce_correct", teamName: entityName, teamId: entityId?.toString(), points: pts,
         });
       } else {
-        await Score.findOneAndUpdate(
-          { roomId: room._id, teamId: answer.teamId },
-          { $inc: { points: -penalty } },
-          { upsert: true }
-        );
+        if (room.mode === "team" && answer.teamId) {
+          await Score.findOneAndUpdate(
+            { roomId: room._id, teamId: answer.teamId },
+            { $inc: { points: -penalty } },
+            { upsert: true }
+          );
+        } else {
+          await Score.findOneAndUpdate(
+            { roomId: room._id, userId: answer.userId },
+            { $inc: { points: -penalty } },
+            { upsert: true }
+          );
+        }
         await Participation.findOneAndUpdate(
           { userId: answer.userId, roomId: room._id },
           { $inc: { totalPoints: -penalty } }
         );
         io.to(`room:${roomCode}`).emit("activity-event", {
-          type: "pounce_wrong", teamName, teamId: answer.teamId?.toString(), points: -penalty,
+          type: "pounce_wrong", teamName: entityName, teamId: entityId?.toString(), points: -penalty,
         });
       }
 
       io.to(`room:${roomCode}`).emit("pounce-marked", {
-        answerId: answer._id.toString(), teamId: answer.teamId?.toString(),
-        teamName, isCorrect, points: isCorrect ? pts : -penalty,
+        answerId: answer._id.toString(), teamId: entityId?.toString(),
+        teamName: entityName, isCorrect, points: isCorrect ? pts : -penalty,
       });
 
       // Check if all pounces marked
