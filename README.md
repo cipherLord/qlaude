@@ -2,6 +2,8 @@
 
 Qlaude is a real-time quiz platform where quizmasters host live quizzes for individuals or teams. Players join with a room code, answer timed questions, and compete on a live leaderboard.
 
+Built with Next.js 14, Socket.IO, MongoDB, and Redis.
+
 ## What It Does
 
 ### Room Modes
@@ -9,22 +11,28 @@ Qlaude is a real-time quiz platform where quizmasters host live quizzes for indi
 - **Individual** -- each player answers on their own and climbs a solo leaderboard.
 - **Team** -- players form teams (with optional passwords), discuss answers in private team chat, and the team captain submits the final answer.
 
+### Scoring Modes
+
+- **Normal** -- everyone answers simultaneously; points awarded for correct answers with a speed bonus.
+- **Bounce** -- turn-based answering; a wrong answer passes the question to the next team or player.
+- **Pounce & Bounce** -- players can pounce (answer early before the direct phase) for bonus points at the risk of a penalty, then the question bounces through remaining participants.
+
 ### Quiz Flow
 
-1. A quizmaster creates a room and shares the room code.
+1. A quizmaster creates a room, picks a mode and scoring type, then shares the room code.
 2. Participants join using the code.
-3. The quizmaster posts questions one at a time with a configurable timer (5--300 seconds).
+3. The quizmaster posts questions one at a time with a configurable timer (5--300 s). Questions can include images or video.
 4. Participants (or team captains in team mode) submit answers before time runs out.
 5. Only the quizmaster can see answers while the timer is running.
 6. After the timer expires, the quizmaster marks the correct answer.
-7. All answers are revealed and points are awarded (10 base + up to 5 speed bonus).
+7. All answers are revealed and points are awarded (configurable base points + up to 5 speed bonus).
 8. The leaderboard updates after each round.
 
 ### Social Features
 
 - **Quizmates** -- a mutual friend system. Send and accept requests by email.
 - **Room Invites** -- invite quizmates to a room via in-app notifications.
-- **Notifications** -- real-time bell for friend requests and room invites.
+- **Notifications** -- real-time bell icon for friend requests and room invites.
 - **Profile** -- quiz history with stats: quizzes played, answers given, total points.
 
 ### Rules
@@ -36,11 +44,23 @@ Qlaude is a real-time quiz platform where quizmasters host live quizzes for indi
 - Disqualified users cannot rejoin the room.
 - Answers submitted after the timer are rejected server-side.
 
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 14 (App Router) |
+| Language | TypeScript 5 |
+| UI | React 18, Tailwind CSS 3.4 |
+| Database | MongoDB (Mongoose 9) |
+| Cache / Adapter | Redis (ioredis), Socket.IO Redis adapter |
+| Real-time | Socket.IO 4.8 |
+| Auth | JWT (access + refresh tokens), bcrypt |
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) 20 or later
 - [MongoDB](https://www.mongodb.com/) (local instance or MongoDB Atlas)
-- [Redis](https://redis.io/) (local instance or a cloud provider)
+- [Redis](https://redis.io/) (local instance or a cloud provider -- optional, falls back to in-memory)
 
 ## Local Development Setup
 
@@ -75,6 +95,15 @@ Generate secure values for the JWT secrets:
 openssl rand -hex 32
 ```
 
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `MONGODB_URI` | Yes | -- | MongoDB connection string |
+| `REDIS_URL` | No | `redis://localhost:6379` | Redis for Socket.IO adapter |
+| `JWT_SECRET` | Yes | -- | Access token signing key |
+| `JWT_REFRESH_SECRET` | Yes | -- | Refresh token signing key |
+| `NEXT_PUBLIC_APP_URL` | No | `http://localhost:3000` | CORS origin for Socket.IO |
+| `PORT` | No | `3000` | HTTP server port |
+
 **4. Start MongoDB and Redis**
 
 Make sure both services are running before starting the app.
@@ -96,13 +125,57 @@ The app starts at `http://localhost:3000` with Socket.IO running on the same por
 | `npm run build` | Create a production build |
 | `npm start` | Run the production server |
 | `npm run lint` | Run ESLint |
+| `npm run test` | Run Jest unit and integration tests |
+| `npm run test:watch` | Run Jest in watch mode |
+| `npm run test:e2e` | Run Playwright end-to-end tests |
+| `npm run test:e2e:ui` | Run Playwright tests with the UI inspector |
+| `npm run test:e2e:headed` | Run Playwright tests in a visible browser |
+
+## Project Structure
+
+```
+├── server.mjs                  # Custom HTTP server (Next.js + Socket.IO)
+├── src/
+│   ├── app/                    # Next.js App Router pages and API routes
+│   │   ├── api/                # REST endpoints (auth, rooms, teams, profile, …)
+│   │   ├── dashboard/          # Dashboard page
+│   │   ├── login/              # Login page
+│   │   ├── register/           # Registration page
+│   │   ├── profile/            # Profile and public profile pages
+│   │   └── room/[code]/        # Quiz room page
+│   ├── components/             # React components
+│   ├── context/                # AuthContext, SocketContext
+│   ├── lib/                    # Database, auth helpers, Redis, Mongoose models
+│   └── socket/                 # Socket.IO event handlers (quiz, chat)
+├── __tests__/                  # Jest unit and integration tests
+├── e2e/                        # Playwright end-to-end tests
+│   ├── helpers/                # Auth and room test helpers
+│   └── scenarios/              # Test scenarios per mode and scoring type
+└── public/                     # Static assets and file uploads
+```
+
+## Testing
+
+**Unit and integration tests** use Jest with an in-memory MongoDB instance (`mongodb-memory-server`):
+
+```bash
+npm run test
+```
+
+**End-to-end tests** use Playwright against a running dev server:
+
+```bash
+npm run test:e2e
+```
+
+E2E scenarios cover room lifecycle, individual normal, individual bounce, team normal, team bounce, and pounce-bounce flows.
 
 ## Contributing
 
 1. Fork the repository and clone your fork.
 2. Create a feature branch from `main`.
 3. Make your changes.
-4. Run `npm run lint` and fix any issues.
+4. Run `npm run lint` and `npm run test` and fix any issues.
 5. Open a pull request describing what you changed and why.
 
 ### Conventions
@@ -111,3 +184,7 @@ The app starts at `http://localhost:3000` with Socket.IO running on the same por
 - Tailwind CSS for styling.
 - API routes live under `src/app/api/`.
 - Socket.IO event handlers live under `src/socket/`.
+
+## License
+
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
