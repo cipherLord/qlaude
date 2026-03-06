@@ -463,7 +463,7 @@ The dev command is `node server.mjs` - a plain node process. Since `quiz.mjs` is
 
 Need to use the right Node version. Let me start it properly.
 
-Port 3000 is still in use. Let me kill the existing processes.
+Port 3100 is still in use. Let me kill the existing processes.
 
 Server is running with the new code. Now refresh the page in your browser, go into the room, and try "Close Room" > "Yes, close". After that, let me check the logs.
 
@@ -581,5 +581,5 @@ All done. Database is wiped clean and server is running fresh:
 - **users**: 3 deleted
 - **participations**: 2 deleted
 
-Server is back up at `http://localhost:3000`. You'll need to register new accounts since all users were cleared.
+Server is back up at `http://localhost:3100`. You'll need to register new accounts since all users were cleared.
 

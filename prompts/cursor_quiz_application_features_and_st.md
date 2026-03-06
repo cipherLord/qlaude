@@ -444,18 +444,18 @@ Dependencies are installed. Let me check the `.env.local` file and then build an
 
 Good, env is configured. Let me first do a quick build check and then start the dev server.
 
-The server is running at **http://localhost:3000**. There's a minor Redis adapter issue - let me fix that and check if the app loads properly.
+The server is running at **http://localhost:3100**. There's a minor Redis adapter issue - let me fix that and check if the app loads properly.
 
 The issue is that `ioredis` auto-connects when you create a `new Redis(url)` without `lazyConnect: true`. Then calling `.connect()` fails because it's already connected. Let me fix this.
 
 Now let me restart the server and check the app.
 
-Port 3000 is still in use. Let me kill all processes on that port and retry.
+Port 3100 is still in use. Let me kill all processes on that port and retry.
 
 The server is up and running cleanly now:
 
 - **Redis adapter**: connected successfully
-- **Server**: ready at **http://localhost:3000**
+- **Server**: ready at **http://localhost:3100**
 
 Let me open the browser to verify it loads.
 
@@ -466,7 +466,7 @@ Everything is compiling and responding cleanly -- no errors at all. Here's a sum
 **Services running:**
 - **MongoDB** -- localhost:27017 (via direct binary from `/tmp`)
 - **Redis** -- localhost:6379 (via Homebrew)
-- **Next.js + Socket.IO** -- http://localhost:3000
+- **Next.js + Socket.IO** -- http://localhost:3100
 
 **Verified working:**
 - Homepage loads (200)
@@ -476,7 +476,7 @@ Everything is compiling and responding cleanly -- no errors at all. Here's a sum
 - Dashboard loads (200)
 - Auth session valid via `/api/auth/me`
 
-You can now open **http://localhost:3000** in your browser to see the app. You can:
+You can now open **http://localhost:3100** in your browser to see the app. You can:
 
 1. **Register** a new account or **log in** with `test@example.com` / `TestPass123!`
 2. Go to the **Dashboard** to create a quiz room

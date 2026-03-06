@@ -46,7 +46,7 @@ export const individualTest = base.extend<IndividualFixture>({
   qmContext: async ({ browser, qmUser }, use) => {
     const ctx = await createAuthenticatedContext(
       browser,
-      "http://localhost:3000",
+      "http://localhost:3100",
       qmUser
     );
     await use(ctx);
@@ -55,7 +55,7 @@ export const individualTest = base.extend<IndividualFixture>({
   p1Context: async ({ browser, player1User }, use) => {
     const ctx = await createAuthenticatedContext(
       browser,
-      "http://localhost:3000",
+      "http://localhost:3100",
       player1User
     );
     await use(ctx);
@@ -64,7 +64,7 @@ export const individualTest = base.extend<IndividualFixture>({
   p2Context: async ({ browser, player2User }, use) => {
     const ctx = await createAuthenticatedContext(
       browser,
-      "http://localhost:3000",
+      "http://localhost:3100",
       player2User
     );
     await use(ctx);
@@ -102,7 +102,7 @@ export const teamTest = base.extend<TeamFixture>({
   qmContext: async ({ browser, qmUser }, use) => {
     const ctx = await createAuthenticatedContext(
       browser,
-      "http://localhost:3000",
+      "http://localhost:3100",
       qmUser
     );
     await use(ctx);
@@ -111,7 +111,7 @@ export const teamTest = base.extend<TeamFixture>({
   cap1Context: async ({ browser, cap1User }, use) => {
     const ctx = await createAuthenticatedContext(
       browser,
-      "http://localhost:3000",
+      "http://localhost:3100",
       cap1User
     );
     await use(ctx);
@@ -120,7 +120,7 @@ export const teamTest = base.extend<TeamFixture>({
   cap2Context: async ({ browser, cap2User }, use) => {
     const ctx = await createAuthenticatedContext(
       browser,
-      "http://localhost:3000",
+      "http://localhost:3100",
       cap2User
     );
     await use(ctx);
@@ -129,7 +129,7 @@ export const teamTest = base.extend<TeamFixture>({
   cap3Context: async ({ browser, cap3User }, use) => {
     const ctx = await createAuthenticatedContext(
       browser,
-      "http://localhost:3000",
+      "http://localhost:3100",
       cap3User
     );
     await use(ctx);

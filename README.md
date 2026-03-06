@@ -44,18 +44,6 @@ Built with Next.js 14, Socket.IO, MongoDB, and Redis.
 - Disqualified users cannot rejoin the room.
 - Answers submitted after the timer are rejected server-side.
 
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 14 (App Router) |
-| Language | TypeScript 5 |
-| UI | React 18, Tailwind CSS 3.4 |
-| Database | MongoDB (Mongoose 9) |
-| Cache / Adapter | Redis (ioredis), Socket.IO Redis adapter |
-| Real-time | Socket.IO 4.8 |
-| Auth | JWT (access + refresh tokens), bcrypt |
-
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) 20 or later
@@ -86,7 +74,7 @@ MONGODB_URI=mongodb://localhost:27017/qlaude
 REDIS_URL=redis://localhost:6379
 JWT_SECRET=<your-secret>
 JWT_REFRESH_SECRET=<your-secret>
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:3100
 ```
 
 Generate secure values for the JWT secrets:
@@ -94,15 +82,6 @@ Generate secure values for the JWT secrets:
 ```bash
 openssl rand -hex 32
 ```
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `MONGODB_URI` | Yes | -- | MongoDB connection string |
-| `REDIS_URL` | No | `redis://localhost:6379` | Redis for Socket.IO adapter |
-| `JWT_SECRET` | Yes | -- | Access token signing key |
-| `JWT_REFRESH_SECRET` | Yes | -- | Refresh token signing key |
-| `NEXT_PUBLIC_APP_URL` | No | `http://localhost:3000` | CORS origin for Socket.IO |
-| `PORT` | No | `3000` | HTTP server port |
 
 **4. Start MongoDB and Redis**
 
@@ -114,45 +93,24 @@ Make sure both services are running before starting the app.
 npm run dev
 ```
 
-The app starts at `http://localhost:3000` with Socket.IO running on the same port.
+The app starts at `http://localhost:3100` with Socket.IO running on the same port.
 
 ## Available Scripts
 
-| Script | Description |
-|---|---|
-| `npm run dev` | Start the custom server (Next.js + Socket.IO) |
-| `npm run dev:next` | Start Next.js only (no real-time features) |
-| `npm run build` | Create a production build |
-| `npm start` | Run the production server |
-| `npm run lint` | Run ESLint |
-| `npm run test` | Run Jest unit and integration tests |
-| `npm run test:watch` | Run Jest in watch mode |
-| `npm run test:e2e` | Run Playwright end-to-end tests |
-| `npm run test:e2e:ui` | Run Playwright tests with the UI inspector |
-| `npm run test:e2e:headed` | Run Playwright tests in a visible browser |
+| Script                    | Description                                   |
+| ------------------------- | --------------------------------------------- |
+| `npm run dev`             | Start the custom server (Next.js + Socket.IO) |
+| `npm run dev:next`        | Start Next.js only (no real-time features)    |
+| `npm run build`           | Create a production build                     |
+| `npm start`               | Run the production server                     |
+| `npm run lint`            | Run ESLint                                    |
+| `npm run test`            | Run Jest unit and integration tests           |
+| `npm run test:watch`      | Run Jest in watch mode                        |
+| `npm run test:e2e`        | Run Playwright end-to-end tests               |
+| `npm run test:e2e:ui`     | Run Playwright tests with the UI inspector    |
+| `npm run test:e2e:headed` | Run Playwright tests in a visible browser     |
 
-## Project Structure
-
-```
-├── server.mjs                  # Custom HTTP server (Next.js + Socket.IO)
-├── src/
-│   ├── app/                    # Next.js App Router pages and API routes
-│   │   ├── api/                # REST endpoints (auth, rooms, teams, profile, …)
-│   │   ├── dashboard/          # Dashboard page
-│   │   ├── login/              # Login page
-│   │   ├── register/           # Registration page
-│   │   ├── profile/            # Profile and public profile pages
-│   │   └── room/[code]/        # Quiz room page
-│   ├── components/             # React components
-│   ├── context/                # AuthContext, SocketContext
-│   ├── lib/                    # Database, auth helpers, Redis, Mongoose models
-│   └── socket/                 # Socket.IO event handlers (quiz, chat)
-├── __tests__/                  # Jest unit and integration tests
-├── e2e/                        # Playwright end-to-end tests
-│   ├── helpers/                # Auth and room test helpers
-│   └── scenarios/              # Test scenarios per mode and scoring type
-└── public/                     # Static assets and file uploads
-```
+````
 
 ## Testing
 
@@ -160,7 +118,7 @@ The app starts at `http://localhost:3000` with Socket.IO running on the same por
 
 ```bash
 npm run test
-```
+````
 
 **End-to-end tests** use Playwright against a running dev server:
 

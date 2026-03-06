@@ -6,7 +6,7 @@ import { Redis } from "ioredis";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "0.0.0.0";
-const port = parseInt(process.env.PORT || "3000", 10);
+const port = parseInt(process.env.PORT || "3100", 10);
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -22,7 +22,7 @@ app.prepare().then(() => {
 
   const io = new Server(httpServer, {
     cors: {
-      origin: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+      origin: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3100",
       credentials: true,
     },
     connectionStateRecovery: {
