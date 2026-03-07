@@ -16,6 +16,10 @@ interface BounceStatusBarProps {
   questionPhase: string | null;
   bounceEndsAt: string | null;
   pounceEndsAt: string | null;
+  bouncePoints?: number;
+  pouncePoints?: number;
+  pouncePenalty?: number;
+  scoringMode?: "bounce" | "pounce_bounce";
 }
 
 export default function BounceStatusBar({
@@ -27,6 +31,10 @@ export default function BounceStatusBar({
   questionPhase,
   bounceEndsAt,
   pounceEndsAt,
+  bouncePoints = 10,
+  pouncePoints = 10,
+  pouncePenalty = 10,
+  scoringMode = "bounce",
 }: BounceStatusBarProps) {
   const attempted = new Set(attemptedTeamIds);
   const pounced = new Set(pouncedTeamIds);
@@ -37,11 +45,15 @@ export default function BounceStatusBar({
         <div className="flex items-center gap-2">
           <span className={`inline-block w-2 h-2 rounded-full ${
             questionPhase === "pounce" ? "bg-purple-400 animate-pulse" :
+            questionPhase === "pounce_marking" ? "bg-purple-400" :
+            questionPhase === "waiting_for_bounce" ? "bg-amber-400" :
             questionPhase === "resolved" ? "bg-gray-500" :
             "bg-amber-400 animate-pulse"
           }`} />
           <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
             {questionPhase === "pounce" ? "Pounce Window" :
+             questionPhase === "pounce_marking" ? "Marking Pounces" :
+             questionPhase === "waiting_for_bounce" ? "Waiting for Bounce" :
              questionPhase === "direct" ? "Direct Answer" :
              questionPhase === "bounce" ? "Bounce Chain" : "Resolved"}
           </span>
@@ -51,6 +63,18 @@ export default function BounceStatusBar({
             <span>Pounce closes in</span>
             <Timer endsAt={pounceEndsAt} onExpired={() => {}} size="sm" />
           </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 mb-3 text-[11px]">
+        <span className="text-amber-300">Bounce: <span className="font-semibold">+{bouncePoints}</span> pts</span>
+        {scoringMode === "pounce_bounce" && (
+          <>
+            <span className="text-gray-600">|</span>
+            <span className="text-purple-300">Pounce: <span className="font-semibold">+{pouncePoints}</span> pts</span>
+            <span className="text-gray-600">|</span>
+            <span className="text-red-300">Wrong pounce: <span className="font-semibold">-{pouncePenalty}</span> pts</span>
+          </>
         )}
       </div>
 

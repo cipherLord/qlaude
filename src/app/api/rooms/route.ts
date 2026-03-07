@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, mode, maxTeams, maxTeamSize, expiresInMinutes, scoringMode, pouncePenalty } = body;
+    const { name, mode, maxTeams, maxTeamSize, expiresInMinutes, scoringMode, pouncePoints, pouncePenalty, totalQuestions } = body;
 
     if (!name || !mode) {
       return NextResponse.json(
@@ -37,17 +37,29 @@ export async function POST(req: NextRequest) {
       ? scoringMode
       : "normal";
 
+    const resolvedPouncePoints = resolvedScoringMode === "pounce_bounce" && pouncePoints && Number(pouncePoints) > 0
+      ? Math.min(100, Number(pouncePoints))
+      : null;
+
     const resolvedPouncePenalty = resolvedScoringMode === "pounce_bounce" && pouncePenalty && Number(pouncePenalty) > 0
       ? Number(pouncePenalty)
       : null;
 
-    const expMinutes = expiresInMinutes || 120;
-    if (expMinutes < 10 || expMinutes > 1440) {
+    const resolvedTotalQuestions = totalQuestions && Number(totalQuestions) > 0
+      ? Math.min(500, Number(totalQuestions))
+      : 0;
+
+    const expMinutes = expiresInMinutes ?? 0;
+    if (expMinutes !== 0 && (expMinutes < 10 || expMinutes > 1440)) {
       return NextResponse.json(
-        { error: "Expiration must be between 10 and 1440 minutes" },
+        { error: "Expiration must be 0 (no limit) or between 10 and 1440 minutes" },
         { status: 400 }
       );
     }
+
+    const expiresAt = expMinutes === 0
+      ? new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000)
+      : new Date(Date.now() + expMinutes * 60 * 1000);
 
     await dbConnect();
 
@@ -70,10 +82,12 @@ export async function POST(req: NextRequest) {
       quizmasterId: authUser.userId,
       mode,
       scoringMode: resolvedScoringMode,
+      pouncePoints: resolvedPouncePoints,
       pouncePenalty: resolvedPouncePenalty,
+      totalQuestions: resolvedTotalQuestions,
       maxTeams: mode === "team" ? maxTeams || null : null,
       maxTeamSize: mode === "team" ? maxTeamSize || 5 : 1,
-      expiresAt: new Date(Date.now() + expMinutes * 60 * 1000),
+      expiresAt,
     });
 
     return NextResponse.json({
@@ -83,7 +97,9 @@ export async function POST(req: NextRequest) {
         name: room.name,
         mode: room.mode,
         scoringMode: room.scoringMode,
+        pouncePoints: room.pouncePoints,
         pouncePenalty: room.pouncePenalty,
+        totalQuestions: room.totalQuestions,
         status: room.status,
         maxTeams: room.maxTeams,
         maxTeamSize: room.maxTeamSize,

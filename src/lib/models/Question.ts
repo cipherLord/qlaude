@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document, Types } from "mongoose";
 
 export type QuestionStatus = "pending" | "active" | "closed";
-export type QuestionPhase = "pounce" | "direct" | "bounce" | "resolved" | null;
+export type QuestionPhase = "pounce" | "pounce_marking" | "waiting_for_bounce" | "direct" | "bounce" | "resolved" | null;
 
 export interface IQuestion extends Document {
   _id: Types.ObjectId;
@@ -13,6 +13,8 @@ export interface IQuestion extends Document {
   points: number;
   parts: number;
   correctAnswer: string | null;
+  pouncePoints: number | null;
+  pouncePenalty: number | null;
   mediaUrl: string | null;
   mediaType: "image" | "video" | null;
   assignedTeamId: Types.ObjectId | null;
@@ -41,12 +43,14 @@ const QuestionSchema = new Schema<IQuestion>(
     points: { type: Number, default: 10, min: 1, max: 100 },
     parts: { type: Number, default: 1, min: 1, max: 10 },
     correctAnswer: { type: String, default: null },
+    pouncePoints: { type: Number, default: null, min: 1, max: 100 },
+    pouncePenalty: { type: Number, default: null, min: 1, max: 100 },
     mediaUrl: { type: String, default: null },
     mediaType: { type: String, enum: ["image", "video", null], default: null },
     assignedTeamId: { type: Schema.Types.ObjectId, ref: "Team", default: null },
     questionPhase: {
       type: String,
-      enum: ["pounce", "direct", "bounce", "resolved", null],
+      enum: ["pounce", "pounce_marking", "waiting_for_bounce", "direct", "bounce", "resolved", null],
       default: null,
     },
     currentBounceTeamId: { type: Schema.Types.ObjectId, ref: "Team", default: null },

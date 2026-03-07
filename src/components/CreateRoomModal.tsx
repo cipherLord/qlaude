@@ -14,8 +14,10 @@ export default function CreateRoomModal({ onClose }: Props) {
   const [maxTeams, setMaxTeams] = useState("");
   const [maxTeamSize, setMaxTeamSize] = useState("5");
   const [scoringMode, setScoringMode] = useState<"normal" | "bounce" | "pounce_bounce">("normal");
+  const [pouncePoints, setPouncePoints] = useState("10");
   const [pouncePenalty, setPouncePenalty] = useState("");
-  const [expiresInMinutes, setExpiresInMinutes] = useState("120");
+  const [totalQuestions, setTotalQuestions] = useState("0");
+  const [expiresInMinutes, setExpiresInMinutes] = useState("0");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -34,7 +36,9 @@ export default function CreateRoomModal({ onClose }: Props) {
           maxTeams: maxTeams ? parseInt(maxTeams) : null,
           maxTeamSize: parseInt(maxTeamSize),
           scoringMode,
+          pouncePoints: scoringMode === "pounce_bounce" ? parseInt(pouncePoints) || 10 : null,
           pouncePenalty: scoringMode === "pounce_bounce" && pouncePenalty ? parseInt(pouncePenalty) : null,
+          totalQuestions: parseInt(totalQuestions) || 0,
           expiresInMinutes: parseInt(expiresInMinutes),
         }),
       });
@@ -222,24 +226,61 @@ export default function CreateRoomModal({ onClose }: Props) {
           </div>
 
           {scoringMode === "pounce_bounce" && (
-            <div className="animate-slide-up">
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                Pounce Penalty
-              </label>
-              <input
-                type="number"
-                value={pouncePenalty}
-                onChange={(e) => setPouncePenalty(e.target.value)}
-                className="input-field"
-                placeholder="Same as question points"
-                min={1}
-                max={100}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Points deducted for wrong pounce. Leave blank to match question points.
-              </p>
+            <div className="animate-slide-up space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Default Pounce Points
+                </label>
+                <input
+                  type="number"
+                  value={pouncePoints}
+                  onChange={(e) => setPouncePoints(e.target.value)}
+                  className="input-field"
+                  placeholder="10"
+                  min={1}
+                  max={100}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Default points for correct pounce. Can be overridden per question.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Pounce Penalty
+                </label>
+                <input
+                  type="number"
+                  value={pouncePenalty}
+                  onChange={(e) => setPouncePenalty(e.target.value)}
+                  className="input-field"
+                  placeholder="Same as pounce points"
+                  min={1}
+                  max={100}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Points deducted for wrong pounce. Leave blank to match pounce points.
+                </p>
+              </div>
             </div>
           )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              Total Questions
+            </label>
+            <input
+              type="number"
+              value={totalQuestions}
+              onChange={(e) => setTotalQuestions(e.target.value)}
+              className="input-field"
+              placeholder="Unlimited"
+              min={0}
+              max={500}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Set to 0 for unlimited questions. Winner is declared after this many questions.
+            </p>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">
@@ -250,6 +291,7 @@ export default function CreateRoomModal({ onClose }: Props) {
               onChange={(e) => setExpiresInMinutes(e.target.value)}
               className="input-field"
             >
+              <option value="0">No time limit</option>
               <option value="30">30 minutes</option>
               <option value="60">1 hour</option>
               <option value="120">2 hours</option>

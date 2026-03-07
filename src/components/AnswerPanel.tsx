@@ -15,9 +15,11 @@ interface AnswerPanelProps {
   assignedTeamId?: string | null;
   myTeamId?: string | null;
   myUserId?: string | null;
+  pouncePoints?: number;
   pouncePenalty?: number | null;
   questionPoints?: number;
   timerExpired?: boolean;
+  pounceResult?: { isCorrect: boolean; points: number } | null;
 }
 
 export default function AnswerPanel({
@@ -32,9 +34,11 @@ export default function AnswerPanel({
   assignedTeamId = null,
   myTeamId = null,
   myUserId = null,
+  pouncePoints = 10,
   pouncePenalty = null,
   questionPoints = 10,
   timerExpired = false,
+  pounceResult = null,
 }: AnswerPanelProps) {
   const [answerTexts, setAnswerTexts] = useState<string[]>(() => Array(parts).fill(""));
   const [submitting, setSubmitting] = useState(false);
@@ -96,6 +100,30 @@ export default function AnswerPanel({
   };
 
   if (hasSubmitted) {
+    if (pounceResult) {
+      return (
+        <div className={`${pounceResult.isCorrect ? "bg-emerald-500/10 border-emerald-500/20 glow-emerald" : "bg-red-500/10 border-red-500/20"} border rounded-xl p-6 text-center animate-scale-in`}>
+          <div className={`inline-flex items-center justify-center w-12 h-12 rounded-full ${pounceResult.isCorrect ? "bg-emerald-500/20" : "bg-red-500/20"} mb-3`}>
+            {pounceResult.isCorrect ? (
+              <svg className="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+          </div>
+          <div className={`text-lg font-semibold mb-1 ${pounceResult.isCorrect ? "text-emerald-400" : "text-red-400"}`}>
+            Pounce {pounceResult.isCorrect ? "Correct!" : "Wrong"}
+          </div>
+          <p className={`text-sm font-medium ${pounceResult.isCorrect ? "text-emerald-300" : "text-red-300"}`}>
+            {pounceResult.points > 0 ? "+" : ""}{pounceResult.points} pts
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-6 text-center glow-emerald animate-scale-in">
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500/20 mb-3">
@@ -133,7 +161,7 @@ export default function AnswerPanel({
           <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-4 text-center">
             <p className="text-purple-300 text-sm mb-2">Pounce window is open!</p>
             <p className="text-gray-500 text-xs mb-3">
-              Risk it? Wrong pounce = <span className="text-red-400 font-medium">-{pouncePenalty ?? questionPoints} pts</span>
+              Correct = <span className="text-emerald-400 font-medium">+{pouncePoints} pts</span> | Wrong = <span className="text-red-400 font-medium">-{pouncePenalty ?? pouncePoints} pts</span>
             </p>
             <button
               onClick={() => setShowPounceInput(true)}
@@ -153,7 +181,7 @@ export default function AnswerPanel({
             </svg>
             <h3 className="text-sm font-medium text-purple-300">Pounce Answer</h3>
           </div>
-          <p className="text-xs text-red-400/80 mb-2">Wrong = -{pouncePenalty ?? questionPoints} pts</p>
+          <p className="text-xs text-red-400/80 mb-2">Correct: +{pouncePoints} pts | Wrong: -{pouncePenalty ?? pouncePoints} pts</p>
           <div className="flex gap-2">
             <input
               type="text"
@@ -191,6 +219,18 @@ export default function AnswerPanel({
       return (
         <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-4 text-center">
           <p className="text-purple-300 text-sm">Pounce window is open...</p>
+        </div>
+      );
+    }
+
+    if (questionPhase === "pounce_marking" || questionPhase === "waiting_for_bounce") {
+      return (
+        <div className="bg-gray-800/20 border border-gray-700/40 rounded-xl p-4 text-center">
+          <p className="text-gray-400 text-sm">
+            {questionPhase === "pounce_marking"
+              ? "Quizmaster is reviewing pounce answers..."
+              : "Waiting for bounce to start..."}
+          </p>
         </div>
       );
     }

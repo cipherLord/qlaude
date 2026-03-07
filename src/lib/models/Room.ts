@@ -11,7 +11,11 @@ export interface IRoom extends Document {
   quizmasterId: Types.ObjectId;
   mode: RoomMode;
   scoringMode: ScoringMode;
+  pouncePoints: number | null;
   pouncePenalty: number | null;
+  totalQuestions: number;
+  isTiebreaker: boolean;
+  tiebreakerEntityIds: Types.ObjectId[];
   maxTeams?: number;
   maxTeamSize: number;
   bannedUserIds: Types.ObjectId[];
@@ -48,7 +52,11 @@ const RoomSchema = new Schema<IRoom>(
       enum: ["normal", "bounce", "pounce_bounce"],
       default: "normal",
     },
+    pouncePoints: { type: Number, default: null, min: 1, max: 100 },
     pouncePenalty: { type: Number, default: null, min: 1 },
+    totalQuestions: { type: Number, default: 0, min: 0 },
+    isTiebreaker: { type: Boolean, default: false },
+    tiebreakerEntityIds: [{ type: Schema.Types.ObjectId }],
     maxTeams: { type: Number, default: null },
     maxTeamSize: { type: Number, default: 5 },
     bannedUserIds: [{ type: Schema.Types.ObjectId, ref: "User" }],

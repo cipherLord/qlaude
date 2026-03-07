@@ -315,7 +315,7 @@ export default function Home() {
             {
               title: "Real-Time Scoring",
               description:
-                "Answers are scored instantly with speed bonuses. Live leaderboard updates after every question round.",
+                "Answers are scored instantly across bounce and pounce modes. Live leaderboard updates after every question.",
               iconType: "scoring" as const,
             },
             {
@@ -375,7 +375,7 @@ export default function Home() {
               step: "4",
               title: "Score & Celebrate",
               description:
-                "The quizmaster reveals answers, marks correct ones, and points are awarded. The fastest correct answer gets bonus points!",
+                "The quizmaster reveals answers, marks correct ones, and points are awarded. Bounce points, pounce points, and penalties are tallied up!",
             },
           ].map((item, i, arr) => (
             <div key={item.step} className="relative flex gap-6 items-start pb-10">

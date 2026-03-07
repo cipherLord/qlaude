@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { registerQuizHandlers } from "./handlers/quiz.mjs";
 import { registerChatHandlers } from "./handlers/chat.mjs";
+import { registerRoomChatHandlers } from "./handlers/room-chat.mjs";
 
 export function registerSocketHandlers(io) {
   io.use((socket, next) => {
@@ -22,5 +23,6 @@ export function registerSocketHandlers(io) {
     console.log(`Socket connected: ${socket.id} (user: ${socket.data.userId})`);
     registerQuizHandlers(io, socket);
     registerChatHandlers(io, socket);
+    registerRoomChatHandlers(io, socket);
   });
 }

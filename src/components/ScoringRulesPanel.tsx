@@ -3,15 +3,18 @@
 interface ScoringRulesPanelProps {
   scoringMode: "bounce" | "pounce_bounce";
   pouncePenalty: number | null;
+  pouncePoints?: number;
   questionPoints: number;
 }
 
 export default function ScoringRulesPanel({
   scoringMode,
   pouncePenalty,
+  pouncePoints,
   questionPoints,
 }: ScoringRulesPanelProps) {
-  const penalty = pouncePenalty ?? questionPoints;
+  const effectivePouncePoints = pouncePoints ?? questionPoints;
+  const penalty = pouncePenalty ?? effectivePouncePoints;
 
   return (
     <div className="glass-card p-4">
@@ -38,7 +41,7 @@ export default function ScoringRulesPanel({
             </li>
             <li className="flex items-start gap-1.5">
               <span className="text-emerald-400 mt-0.5">&#8226;</span>
-              <span>Pounce correct: <span className="text-emerald-300 font-medium">+{questionPoints} pts</span></span>
+              <span>Pounce correct: <span className="text-emerald-300 font-medium">+{effectivePouncePoints} pts</span></span>
             </li>
             <li className="flex items-start gap-1.5">
               <span className="text-red-400 mt-0.5">&#8226;</span>
